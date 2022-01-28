@@ -1,0 +1,58 @@
+version: "3"
+services:
+  db:
+    image: postgres
+    container_name: db
+    environment:
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextcloud
+      - POSTGRES_PASSWORD=
+    volumes:
+      - ./db:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - proxy
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - proxy
+    volumes:
+      - ./redis:/data
+
+
+  nextcloud:
+    image: nextcloud
+    container_name: nextcloud
+    environment:
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=
+      - POSTGRES_HOST=db
+      - POSTGRES_PASSWORD=
+      - REDIS_HOST=redis
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./nextcloud:/var/www/html
+    networks:
+      - proxy
+    ports: # Not necessary if you have nothing running on port 80
+      - 420:80
+    restart: unless-stopped
+    links:
+      - db
+      - redis
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.nextcloud.entrypoints=https"
+    - "traefik.http.routers.nextcloud.rule=Host(`cloud.domain.com`)"
+    - "traefik.http.routers.nextcloud.tls=true"
+    - "traefik.http.routers.nextcloud.service=nextcloud"
+    - "traefik.http.middlewares.nextcloud.redirectscheme.scheme=https"
+    - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+
+networks:
+  proxy:
+    external: true
